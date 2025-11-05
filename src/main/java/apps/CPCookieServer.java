@@ -18,6 +18,8 @@ public class CPCookieServer {
         try {
             cp = new CPProtocol(phy, true);
         } catch (Exception e) {
+            System.err.println("Failed to initialize CPProtocol: " + e.getMessage());
+            e.printStackTrace();
             return;
         }
 

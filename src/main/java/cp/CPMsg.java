@@ -4,9 +4,6 @@ import core.Msg;
 import exceptions.IWProtocolException;
 import exceptions.IllegalMsgException;
 
-import java.util.zip.CRC32;
-import java.util.zip.Checksum;
-
 class CPMsg extends Msg {
     protected static final String CP_HEADER = "cp";
     @Override
@@ -24,18 +21,22 @@ class CPMsg extends Msg {
         String[] parts = sentence.split("\\s+", 2);
         if(parts.length < 2)
             throw new IllegalMsgException();
-        if(parts[1].startsWith(CPCookieRequestMsg.CP_CREQ_HEADER)) {
+        String rest = parts[1];
+        if(rest.startsWith(CPCookieRequestMsg.CP_CREQ_HEADER)) {
             parsedMsg = new CPCookieRequestMsg();
-        } else if(parts[1].startsWith(CPCookieResponseMsg.CP_CRES_HEADER)) {
+        } else if(rest.startsWith(CPCookieResponseMsg.CP_CRES_HEADER)) {
             parsedMsg = new CPCookieResponseMsg();
+        } else if(rest.startsWith(CPCommandResponseMsg.CP_CMD_RES_HEADER)) {
+            // WICHTIG: zuerst command_response prüfen, da es mit "command" beginnt
+            parsedMsg = new CPCommandResponseMsg();
+        } else if(rest.startsWith(CPCommandMsg.CP_CMD_HEADER)) {
+            parsedMsg = new CPCommandMsg();
         } else {
-            // Default: treat as command message
-            // Both CPCommandMsg and CPCommandResponseMsg have CRC at the end,
-            // so we can't distinguish by CRC alone. The parser will handle it.
+            // Fallback: treat as command
             parsedMsg = new CPCommandMsg();
         }
 
-        parsedMsg = (CPMsg) parsedMsg.parse(parts[1]);
+        parsedMsg = (CPMsg) parsedMsg.parse(rest);
         return parsedMsg;
     }
 

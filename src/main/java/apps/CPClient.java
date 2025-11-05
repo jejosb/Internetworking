@@ -61,8 +61,30 @@ public class CPClient {
                 cp.send(sentence, null);
                 Msg response = cp.receive();
                 if (response != null) {
-                    String answer = response.getData();
-                    System.out.println(answer);
+                    // Process the response message
+                    if (response instanceof CPCommandResponseMsg) {
+                        CPCommandResponseMsg responseMsg = (CPCommandResponseMsg) response;
+                        if (responseMsg.isSuccess()) {
+                            // Command was successful
+                            String payload = responseMsg.getResponse();
+                            if (payload != null && !payload.isEmpty()) {
+                                System.out.println("Response: " + payload);
+                            } else {
+                                System.out.println("Command executed successfully.");
+                            }
+                        } else {
+                            // Command failed
+                            String errorMsg = responseMsg.getResponse();
+                            if (errorMsg != null && !errorMsg.isEmpty()) {
+                                System.out.println("Error: " + errorMsg);
+                            } else {
+                                System.out.println("Command failed.");
+                            }
+                        }
+                    } else {
+                        // Fallback: show raw data
+                        System.out.println(response.getData());
+                    }
                 }
             } catch (IWProtocolException | IOException e) {
                 System.out.println("Command not accepted by server ... try again");

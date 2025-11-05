@@ -31,15 +31,22 @@ public class CPCommandServer {
             try {
                 Msg receivedMsg = cp.receive();
                 
+                // Debug: print raw received data
+                if (receivedMsg != null) {
+                    System.out.println("[CPCommandServer] RECV: " + receivedMsg.getData());
+                }
+                
                 // Check if we received a valid message
                 if (receivedMsg == null) {
                     continue;
                 }
                 
-                // Extract the command from the message
+                // Extract the command and id from the message
                 String commandToProcess;
-                if (receivedMsg instanceof cp.CPCommandMsg) {
-                    commandToProcess = ((cp.CPCommandMsg) receivedMsg).getCommand();
+                int cmdId = 0;
+                if (receivedMsg instanceof cp.CPCommandMsg cmdMsg) {
+                    commandToProcess = cmdMsg.getCommand();
+                    cmdId = cmdMsg.getId();
                 } else {
                     // Fallback: use getData() if not a CPCommandMsg
                     commandToProcess = receivedMsg.getData();
@@ -47,17 +54,28 @@ public class CPCommandServer {
                 
                 // Process the command and send response
                 String response = processCommand(commandToProcess);
+                boolean ok = !response.startsWith("ERROR");
+                String payload = "";
+                if (ok) {
+                    // Check if response contains payload after "OK:"
+                    if (response.startsWith("OK:")) {
+                        payload = response.substring(3); // Extract text after "OK:"
+                    }
+                    // If response is just "OK", payload remains empty
+                } else {
+                    payload = extractErrorMessage(response);
+                }
                 
-                // Create CPCommandResponseMsg with CRC
-                CPCommandResponseMsg responseMsg = new CPCommandResponseMsg(response, true);
-                // Create the message with CRC
-                responseMsg.createMessage(response);
+                // Create CPCommandResponseMsg with CRC following spec
+                CPCommandResponseMsg responseMsg = new CPCommandResponseMsg();
+                responseMsg.create(cmdId, ok, payload);
                 String responseData = new String(responseMsg.getDataBytes());
                 
                 // Send response back to client
                 // Use configuration from received message to send response back to correct client
                 PhyConfiguration responseConfig = (PhyConfiguration) receivedMsg.getConfiguration();
                 phy.send(responseData, responseConfig);
+                System.out.println("[CPCommandServer] SEND: " + responseData);
                 
             } catch (IOException e) {
                 return;
@@ -75,15 +93,25 @@ public class CPCommandServer {
         String cmd = command.trim();
         
         if (cmd.equals("status")) {
-            return "Server Status: Running - All systems operational";
+            return "OK"; // No payload expected
         } else if (cmd.startsWith("print ")) {
             String text = cmd.substring(6); // Remove "print " prefix
             if (text.startsWith("\"") && text.endsWith("\"")) {
                 text = text.substring(1, text.length() - 1); // Remove quotes
             }
-            return "Printed: " + text;
+            // Return the text that was printed as payload
+            return "OK:" + text;
         } else {
             return "ERROR: Unknown command. Supported commands: status, print \"text\"";
         }
+    }
+
+    private static String extractErrorMessage(String response) {
+        // Expect formats like "ERROR: <text>" or "ERROR: <code> <text>"
+        int idx = response.indexOf(":");
+        if (idx >= 0 && idx + 1 < response.length()) {
+            return response.substring(idx + 1).trim();
+        }
+        return response;
     }
 }

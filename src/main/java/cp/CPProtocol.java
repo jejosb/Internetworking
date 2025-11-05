@@ -16,7 +16,8 @@ public class CPProtocol extends Protocol {
     private static final int CP_TIMEOUT = 2000;
     private static final int CP_HASHMAP_SIZE = 20;
     private int cookie;
-    private int id;
+    private int id; // next command id
+    private Integer lastSentCommandId; // track last sent id for correlation
     private PhyConfiguration PhyConfigCommandServer;
     private PhyConfiguration PhyConfigCookieServer;
     private final PhyProtocol PhyProto;
@@ -64,9 +65,11 @@ public class CPProtocol extends Protocol {
             }
         }
 
-        // Create command message
+        // Create command message with ID
         CPCommandMsg msg = new CPCommandMsg();
-        msg.create(s);
+        int currentId = this.id++;
+        msg.create(currentId, s);
+        this.lastSentCommandId = currentId;
         
         // Send through physical layer
         if (this.role == cp_role.CLIENT) {
@@ -141,31 +144,26 @@ public class CPProtocol extends Protocol {
                     resMsg = new CPMsg().parse(in.getData());
                     resMsg.setConfiguration(in.getConfiguration());
                     
-                    // c. Check if response matches the sent command message
-                    if (resMsg instanceof CPCommandMsg) {
-                        // d. Check if Command Server accepted the command
-                        String responseData = resMsg.getData();
-                        if (responseData != null && !responseData.isEmpty()) {
-                            // e. Return the result to the client
-                            waitForResp = false;
-                        } else {
-                            // Invalid message, retry
-                            continue;
-                        }
-                    } else if (resMsg instanceof CPCommandResponseMsg) {
-                        // CRC-validierte Command Response Message
+                    // c. Check if response matches the sent command id and type
+                    if (resMsg instanceof CPCommandResponseMsg) {
                         CPCommandResponseMsg responseMsg = (CPCommandResponseMsg) resMsg;
-                        if (responseMsg.getResponse() != null && !responseMsg.getResponse().isEmpty()) {
-                            // e. Return the result to the client
-                            waitForResp = false;
-                        } else {
-                            // Invalid response, retry
+                        if (this.lastSentCommandId == null || responseMsg.getId() != this.lastSentCommandId) {
+                            // Not for us, continue waiting
                             continue;
                         }
+                        // d. Check acceptance
+                        if (!responseMsg.isSuccess()) {
+                            throw new CookieTimeoutException();
+                        }
+                        // e. Valid OK response received
+                        waitForResp = false;
                     } else {
-                        // Unknown message type, retry
+                        // Ignore other message types
                         continue;
                     }
+                } catch (CookieTimeoutException e) {
+                    // Re-throw CookieTimeoutException immediately
+                    throw e;
                 } catch (IWProtocolException e) {
                     // b. If parser throws exception, discard the message and retry
                     continue;
@@ -179,16 +177,8 @@ public class CPProtocol extends Protocol {
         }
         
         // If no valid response received after 3 attempts
-        if (resMsg == null || count >= 3) {
+        if (waitForResp && (resMsg == null || count >= 3)) {
             throw new CookieTimeoutException();
-        }
-
-        // Prüfe auf error-Antwort
-        if (resMsg instanceof CPCommandResponseMsg) {
-            CPCommandResponseMsg responseMsg = (CPCommandResponseMsg) resMsg;
-            if (responseMsg.getResponse() != null && responseMsg.getResponse().trim().startsWith("error")) {
-                throw new CookieTimeoutException();
-            }
         }
 
         return resMsg;
@@ -233,6 +223,10 @@ public class CPProtocol extends Protocol {
 
             try {
                 Msg in = this.PhyProto.receive(CP_TIMEOUT);
+                if (in == null) {
+                    count += 1;
+                    continue;
+                }
                 if (((PhyConfiguration) in.getConfiguration()).getPid() != proto_id.CP)
                     continue;
                 resMsg = ((CPMsg) resMsg).parse(in.getData());
