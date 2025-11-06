@@ -65,13 +65,13 @@ public class CPProtocol extends Protocol {
             }
         }
 
-        // Create command message with ID
+        // Task 1.2.1.a: Create a command message object
         CPCommandMsg msg = new CPCommandMsg();
         int currentId = this.id++;
         msg.create(currentId, s);
         this.lastSentCommandId = currentId;
         
-        // Send through physical layer
+        // Task 1.2.1.b: Send the command to the Command Server via the PHY layer
         if (this.role == cp_role.CLIENT) {
             this.PhyProto.send(new String(msg.getDataBytes()), this.PhyConfigCommandServer);
         } else {
@@ -126,8 +126,8 @@ public class CPProtocol extends Protocol {
         
         while(waitForResp && count < 3) {
             try {
-                // a. Wait maximum 3 seconds for response from Command Server
-                Msg in = this.PhyProto.receive(3000); // 3 seconds timeout
+                // Task 1.2.2.a: For each sent command message, the client waits a maximum of two seconds (2000ms) for a response from the Command Server. Call the corresponding receive method of the PHY layer.
+                Msg in = this.PhyProto.receive(2000); // 2 seconds timeout
                 
                 if (in == null) {
                     count += 1;
@@ -139,34 +139,32 @@ public class CPProtocol extends Protocol {
                     continue;
                 }
                 
-                // b. Parse the received message
+                // Task 1.2.2.b: Call the message parser to create a CP message object from the received string object according to the protocol specification.
                 try {
                     resMsg = new CPMsg().parse(in.getData());
                     resMsg.setConfiguration(in.getConfiguration());
                     
-                    // c. Check if response matches the sent command id and type
+                    // Task 1.2.2.c: Check if the response matches the command message by comparing the message ID of the received message with the ID of the sent message.
                     if (resMsg instanceof CPCommandResponseMsg) {
                         CPCommandResponseMsg responseMsg = (CPCommandResponseMsg) resMsg;
                         if (this.lastSentCommandId == null || responseMsg.getId() != this.lastSentCommandId) {
                             // Not for us, continue waiting
                             continue;
                         }
-                        // d. Check acceptance
+                        // Task 1.2.2.d: Check if the Command Server has accepted the command.
                         if (!responseMsg.isSuccess()) {
                             throw new CookieTimeoutException();
                         }
-                        // e. Valid OK response received
+                        // Task 1.2.2.e: Return an appropriate response to the client.
                         waitForResp = false;
                     } else {
                         // Ignore other message types
-                        continue;
                     }
                 } catch (CookieTimeoutException e) {
                     // Re-throw CookieTimeoutException immediately
                     throw e;
                 } catch (IWProtocolException e) {
-                    // b. If parser throws exception, discard the message and retry
-                    continue;
+                    // Task 1.2.2.b: If the parser throws an exception, the message should be discarded.
                 }
                 
             } catch (SocketTimeoutException e) {

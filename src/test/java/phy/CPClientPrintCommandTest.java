@@ -57,25 +57,41 @@ public class CPClientPrintCommandTest {
         assertDoesNotThrow(()->cProtocol.receive());
 
         // verify a specified behavior
-        verify(phyProtocolMock, times(1)).receive(3000);
+        verify(phyProtocolMock, times(1)).receive(2000);
     }
 
     @Test
     void testCommandResponseError() throws IWProtocolException, IOException {
-        testMsg = (PhyMsg)testMsg.parse("phy 7 cp command_response 0 error 0 3923725728");
+        // Fill the message object that is going to be returned to the object-under-test
+        // with the message needed for this test case
+        testMsg = (PhyMsg)testMsg.parse("phy 7 cp command_response 0 error 0 4233987072");
+
+        // Implement behavior of the mocked object
         when(phyProtocolMock.receive(anyInt())).thenReturn(testMsg);
+
+        // Run the test
         assertThrows(CookieTimeoutException.class,
                 ()->cProtocol.receive());
-        verify(phyProtocolMock, times(1)).receive(3000);
+
+        // verify a specified behavior
+        verify(phyProtocolMock, times(1)).receive(2000);
     }
 
     @Test
     void testCommandResponseErrorWithMessage() throws IWProtocolException, IOException {
-        testMsg = (PhyMsg)testMsg.parse("phy 7 cp command_response 0 error 16 Out of Resources 432867732");
+        // Fill the message object that is going to be returned to the object-under-test
+        // with the message needed for this test case
+        testMsg = (PhyMsg)testMsg.parse("phy 7 cp command_response 0 error 16 Out of Resources 367825814");
+
+        // Implement behavior of the mocked object
         when(phyProtocolMock.receive(anyInt())).thenReturn(testMsg);
+
+        // Run the test
         assertThrows(CookieTimeoutException.class,
                 ()->cProtocol.receive());
-        verify(phyProtocolMock, times(1)).receive(3000);
+
+        // verify a specified behavior
+        verify(phyProtocolMock, times(1)).receive(2000);
     }
 
     @Test
@@ -92,7 +108,7 @@ public class CPClientPrintCommandTest {
         assertDoesNotThrow(()->cProtocol.receive());
 
         // verify a specified behavior
-        verify(phyProtocolMock, times(2)).receive(3000);
+        verify(phyProtocolMock, times(2)).receive(2000);
     }
 
     @Test
@@ -109,7 +125,7 @@ public class CPClientPrintCommandTest {
         assertDoesNotThrow(()->cProtocol.receive());
 
         // verify a specified behavior
-        verify(phyProtocolMock, times(2)).receive(3000);
+        verify(phyProtocolMock, times(2)).receive(2000);
     }
 
     @Test
@@ -126,7 +142,7 @@ public class CPClientPrintCommandTest {
         assertDoesNotThrow(()->cProtocol.receive());
 
         // verify a specified behavior
-        verify(phyProtocolMock, times(2)).receive(3000);
+        verify(phyProtocolMock, times(2)).receive(2000);
     }
 
     @Test
@@ -143,7 +159,7 @@ public class CPClientPrintCommandTest {
         assertDoesNotThrow(()->cProtocol.receive());
 
         // verify a specified behavior
-        verify(phyProtocolMock, times(2)).receive(3000);
+        verify(phyProtocolMock, times(2)).receive(2000);
     }
 
     @Test
@@ -160,6 +176,6 @@ public class CPClientPrintCommandTest {
         assertDoesNotThrow(()->cProtocol.receive());
 
         // verify a specified behavior
-        verify(phyProtocolMock, times(2)).receive(3000);
+        verify(phyProtocolMock, times(2)).receive(2000);
     }
 }

@@ -11,7 +11,7 @@ public class CPCommandMsg extends CPMsg {
     private int length;
     private String command;
     
-    // Getter und Setter
+    // Task 1.2.3.b: Add Getter/Setter methods as needed for other tasks.
     public long getCrc32() { 
         return crc32; 
     }
@@ -29,7 +29,7 @@ public class CPCommandMsg extends CPMsg {
         this.command = command; 
     }
     
-    // Helper to compute CRC32 over "id length command"
+    // Task 1.2.3.a: Use the CRC32 class from Java to calculate the CRC checksum
     private static long crcFor(int id, int length, String command) {
         CRC32 crc = new CRC32();
         String payload = id + " " + length + (length > 0 ? " " + command : "");

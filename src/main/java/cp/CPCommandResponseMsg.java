@@ -12,6 +12,7 @@ public class CPCommandResponseMsg extends CPMsg {
     private int length;      // payload length in bytes
     private String response; // optional payload
     
+    // Task 1.2.3.b: Add Getter/Setter methods as needed for other tasks.
     public long getCrc32() { return crc32; }
     public int getId() { return id; }
     public boolean isSuccess() { return success; }
@@ -22,6 +23,7 @@ public class CPCommandResponseMsg extends CPMsg {
     public void setSuccess(boolean success) { this.success = success; }
     public void setResponse(String response) { this.response = response; }
 
+    // Task 1.2.3.a: Use the CRC32 class from Java to calculate the CRC checksum
     private static long crcFor(int id, boolean success, int length, String payload) {
         String status = success ? "ok" : "error";
         // CRC is calculated over "status length [payload]" WITHOUT id
