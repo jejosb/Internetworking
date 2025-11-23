@@ -10,7 +10,6 @@ import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Random;
 
 public class CPProtocol extends Protocol {
     private static final int CP_TIMEOUT = 2000;
@@ -24,7 +23,6 @@ public class CPProtocol extends Protocol {
     private final cp_role role;
     HashMap<PhyConfiguration, Cookie> cookieMap;
     ArrayList<CPCommandMsg> pendingCommands;
-    Random rnd;
 
     private enum cp_role {
         CLIENT, COOKIE, COMMAND
@@ -44,7 +42,6 @@ public class CPProtocol extends Protocol {
         if (isCookieServer) {
             this.role = cp_role.COOKIE;
             this.cookieMap = new HashMap<>();
-            this.rnd = new Random();
         } else {
             this.role = cp_role.COMMAND;
             this.pendingCommands = new ArrayList<>();
@@ -228,8 +225,8 @@ public class CPProtocol extends Protocol {
             // security concerns with allowing early renewal. The old cookie is effectively
             // invalidated when replaced, which is the desired behavior.
 
-            // Generate a random cookie
-            int newCookie = rnd.nextInt(1000000);
+            // Generate a unique cookie using current time in milliseconds
+            int newCookie = (int) System.currentTimeMillis();
             Cookie cookieObj = new Cookie(System.currentTimeMillis(), newCookie);
 
             // Store in HashMap (Task 2.1.2.a) - this handles both new entries and updates
