@@ -37,6 +37,7 @@ public class CPProtocol extends Protocol {
         this.role = cp_role.CLIENT;
         this.cookie = -1;
     }
+
     // Constructor for servers
     public CPProtocol(PhyProtocol phyP, boolean isCookieServer) {
         this.PhyProto = phyP;
@@ -54,7 +55,6 @@ public class CPProtocol extends Protocol {
         this.PhyConfigCookieServer = new PhyConfiguration(rname, rp, proto_id.CP);
     }
 
-
     @Override
     public void send(String s, Configuration config) throws IOException, IWProtocolException {
         if (this.role == cp_role.CLIENT) {
@@ -70,7 +70,7 @@ public class CPProtocol extends Protocol {
         int currentId = this.id++;
         msg.create(currentId, s);
         this.lastSentCommandId = currentId;
-        
+
         // Task 1.2.1.b: Send the command to the Command Server via the PHY layer
         if (this.role == cp_role.CLIENT) {
             this.PhyProto.send(new String(msg.getDataBytes()), this.PhyConfigCommandServer);
@@ -86,20 +86,20 @@ public class CPProtocol extends Protocol {
         if (this.role == cp_role.CLIENT) {
             return receiveCommandResponse();
         }
-        
+
         // For servers: normal receive
         try {
             // Receive message from physical layer
             Msg phyMsg = this.PhyProto.receive();
-            
+
             if (phyMsg == null) {
                 return null;
             }
-            
+
             // Parse the received message
             CPMsg cpmIn = (CPMsg) new CPMsg().parse(phyMsg.getData());
             cpmIn.setConfiguration(phyMsg.getConfiguration());
-            
+
             // Process based on role
             if (this.role == cp_role.COOKIE) {
                 cookie_process(cpmIn);
@@ -107,7 +107,7 @@ public class CPProtocol extends Protocol {
             } else if (this.role == cp_role.COMMAND) {
                 return command_process(cpmIn);
             }
-            
+
             return cpmIn;
         } catch (IWProtocolException e) {
             // If parsing fails, return null
@@ -117,34 +117,38 @@ public class CPProtocol extends Protocol {
             return null;
         }
     }
-    
+
     // Method for clients to receive command responses
     private Msg receiveCommandResponse() throws IOException, IWProtocolException {
         boolean waitForResp = true;
         int count = 0;
         Msg resMsg = null;
-        
-        while(waitForResp && count < 3) {
+
+        while (waitForResp && count < 3) {
             try {
-                // Task 1.2.2.a: For each sent command message, the client waits a maximum of two seconds (2000ms) for a response from the Command Server. Call the corresponding receive method of the PHY layer.
+                // Task 1.2.2.a: For each sent command message, the client waits a maximum of
+                // two seconds (2000ms) for a response from the Command Server. Call the
+                // corresponding receive method of the PHY layer.
                 Msg in = this.PhyProto.receive(2000); // 2 seconds timeout
-                
+
                 if (in == null) {
                     count += 1;
                     continue;
                 }
-                
+
                 // Check if message is from CP protocol
                 if (((PhyConfiguration) in.getConfiguration()).getPid() != proto_id.CP) {
                     continue;
                 }
-                
-                // Task 1.2.2.b: Call the message parser to create a CP message object from the received string object according to the protocol specification.
+
+                // Task 1.2.2.b: Call the message parser to create a CP message object from the
+                // received string object according to the protocol specification.
                 try {
                     resMsg = new CPMsg().parse(in.getData());
                     resMsg.setConfiguration(in.getConfiguration());
-                    
-                    // Task 1.2.2.c: Check if the response matches the command message by comparing the message ID of the received message with the ID of the sent message.
+
+                    // Task 1.2.2.c: Check if the response matches the command message by comparing
+                    // the message ID of the received message with the ID of the sent message.
                     if (resMsg instanceof CPCommandResponseMsg) {
                         CPCommandResponseMsg responseMsg = (CPCommandResponseMsg) resMsg;
                         if (this.lastSentCommandId == null || responseMsg.getId() != this.lastSentCommandId) {
@@ -164,16 +168,17 @@ public class CPProtocol extends Protocol {
                     // Re-throw CookieTimeoutException immediately
                     throw e;
                 } catch (IWProtocolException e) {
-                    // Task 1.2.2.b: If the parser throws an exception, the message should be discarded.
+                    // Task 1.2.2.b: If the parser throws an exception, the message should be
+                    // discarded.
                 }
-                
+
             } catch (SocketTimeoutException e) {
                 count += 1;
             } catch (Exception e) {
                 count += 1;
             }
         }
-        
+
         // If no valid response received after 3 attempts
         if (waitForResp && (resMsg == null || count >= 3)) {
             throw new CookieTimeoutException();
@@ -191,22 +196,50 @@ public class CPProtocol extends Protocol {
         return null;
     }
 
-
     // Processing of the CookieRequestMsg
     private void cookie_process(CPMsg cpmIn) throws IWProtocolException, IOException {
+        // Task 2.1.1: Enhance CPProtocol.receive() to receive cookie requests.
+        // The cookie requests shall be processed in a dedicated method.
         if (cpmIn instanceof CPCookieRequestMsg) {
+            PhyConfiguration clientConfig = (PhyConfiguration) cpmIn.getConfiguration();
+
+            // Task 2.1.2.a: The mappings of clients to cookies are stored in a Java
+            // HashMap.
+            // There shall never be more than 20 entries in the HashMap.
+            // Check if new client and limit reached
+            if (!cookieMap.containsKey(clientConfig) && cookieMap.size() >= CP_HASHMAP_SIZE) {
+                // Reject request
+                CPCookieResponseMsg response = new CPCookieResponseMsg(false);
+                response.create("Cookie limit reached");
+                this.PhyProto.send(new String(response.getDataBytes()), clientConfig);
+                return;
+            }
+
+            // Task 2.1.2.b: Make an implementation decision on the processing of premature
+            // cookie renewal.
+            // Decision: Allow premature renewal.
+            // Reasoning: If a client restarts or loses its state, it may request a new
+            // cookie before the old one expires.
+            // Rejecting this would lock out the client until the old cookie expires, which
+            // is poor UX and hinders testing.
+            // By allowing renewal, we simply update the existing entry, which is safe.
+
             // Generate a random cookie
             int newCookie = rnd.nextInt(1000000);
-            
-            // Create cookie response
+            Cookie cookieObj = new Cookie(System.currentTimeMillis(), newCookie);
+
+            // Store in HashMap (Task 2.1.2.a) - this handles both new entries and updates
+            // (renewals)
+            cookieMap.put(clientConfig, cookieObj);
+
+            // Task 2.1.2.c: Send an appropriate response message to the client.
             CPCookieResponseMsg response = new CPCookieResponseMsg(true);
             response.create(String.valueOf(newCookie));
-            
+
             // Send response back
-            this.PhyProto.send(new String(response.getDataBytes()), cpmIn.getConfiguration());
+            this.PhyProto.send(new String(response.getDataBytes()), clientConfig);
         }
     }
-
 
     // Method for the client to request a cookie
     public void requestCookie() throws IOException, IWProtocolException {
@@ -216,7 +249,7 @@ public class CPProtocol extends Protocol {
 
         boolean waitForResp = true;
         int count = 0;
-        while(waitForResp && count < 3) {
+        while (waitForResp && count < 3) {
             this.PhyProto.send(new String(reqMsg.getDataBytes()), this.PhyConfigCookieServer);
 
             try {
@@ -228,7 +261,7 @@ public class CPProtocol extends Protocol {
                 if (((PhyConfiguration) in.getConfiguration()).getPid() != proto_id.CP)
                     continue;
                 resMsg = ((CPMsg) resMsg).parse(in.getData());
-                if(resMsg instanceof CPCookieResponseMsg)
+                if (resMsg instanceof CPCookieResponseMsg)
                     waitForResp = false;
             } catch (SocketTimeoutException e) {
                 count += 1;
@@ -236,13 +269,13 @@ public class CPProtocol extends Protocol {
             }
         }
 
-        if(count == 3)
+        if (count == 3)
             throw new CookieRequestException();
-        if(resMsg instanceof CPCookieResponseMsg && !((CPCookieResponseMsg) resMsg).getSuccess()) {
+        if (resMsg instanceof CPCookieResponseMsg && !((CPCookieResponseMsg) resMsg).getSuccess()) {
             throw new CookieRequestException();
         }
-         assert resMsg instanceof CPCookieResponseMsg;
-         this.cookie = ((CPCookieResponseMsg)resMsg).getCookie();
+        assert resMsg instanceof CPCookieResponseMsg;
+        this.cookie = ((CPCookieResponseMsg) resMsg).getCookie();
     }
 }
 
@@ -259,5 +292,7 @@ class Cookie {
         return timeOfCreation;
     }
 
-    public int getCookieValue() { return cookieValue;}
+    public int getCookieValue() {
+        return cookieValue;
+    }
 }
