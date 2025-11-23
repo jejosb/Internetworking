@@ -215,14 +215,18 @@ public class CPProtocol extends Protocol {
                 return;
             }
 
-            // Task 2.1.2.b: Make an implementation decision on the processing of premature
-            // cookie renewal.
-            // Decision: Allow premature renewal.
-            // Reasoning: If a client restarts or loses its state, it may request a new
-            // cookie before the old one expires.
-            // Rejecting this would lock out the client until the old cookie expires, which
-            // is poor UX and hinders testing.
-            // By allowing renewal, we simply update the existing entry, which is safe.
+            // Task 2.1.2.b: Implementation decision on premature cookie renewal.
+            // Decision: We allow clients to request a new cookie even if their old one hasn't expired yet.
+            // 
+            // Alternative approach: Reject premature renewal requests and force clients to wait
+            // until their old cookie expires.
+            //
+            // Rationale for our choice: Clients may restart or lose their state, which would
+            // require them to request a new cookie. Rejecting such requests would lock them out
+            // until expiration, which is impractical for development, testing, and real-world
+            // scenarios. Since HashMap.put() simply overwrites the existing entry, there are no
+            // security concerns with allowing early renewal. The old cookie is effectively
+            // invalidated when replaced, which is the desired behavior.
 
             // Generate a random cookie
             int newCookie = rnd.nextInt(1000000);
